@@ -1,4 +1,5 @@
 ## Bike-ability index
+---
 
 This project is intended to assess the bikeability of locations based
 on ease of access to population.  The characteristic I intend to
@@ -45,6 +46,7 @@ geodata['tracts'].crs = {'init': 'epsg:4326'}
 geodata['bikefacilities'].crs = {'init': 'epsg:2877'}
 ```
 
+#### Preparing the data
 
 Now that we have the data downloaded, let's start working with it.
 This is my first strategy:
@@ -72,10 +74,6 @@ ga = ga[['geometry', 'density']]
 w0 = 600 #ft, i.e. 100 yd on either side 
 
 ```
-
-My originial idea was to chop up the paths by the census tract
-boundaries.  This isn't good, because it results in some very small
-lengths and it leaves some very long paths.  Instead I'd like to 
 
 ```python 2 Intersection
 ga['geocopy'] = ga.geometry
@@ -105,6 +103,8 @@ segs = (segs.loc[segs['geometry'].type == 'LineString' ]).append(
 
 ```
 
+#### Calculating the statistic
+
 Now for a given piece add the contribution from each successive
 contiguous piece.  Here I think I'll store each contiguous set so it
 won't have to calculate it each time.  No, this won't work because the
@@ -112,18 +112,20 @@ distance to the point in question will change.  Oh and how to deal
 with multiple ways of getting to the same place?  I must extend the
 network only on the branch of shortest length.
 
-strategy: make a dictionary with keys being the length and values the
+Strategy: make a dictionary with keys being the length and values the
 tail of the thread.  In case there are threads with identical lengths,
-make the key (length, index).  then pick the shortest available
+make the key (length, index).  Then pick the shortest available
 non-dead end.  Sorting is by first member then second member, so that
 works fine.  
 
 Most of the work of growing the tree comes from finding the
-intersections.  These I save in a dictionary for future use.  Some of
+intersections.  These I save in a data series for future use.  Some of
 the stats seem really high.  I'm pretty sure that this is because the
 metric is ill conditioned if the root segment is really short.  I
 think I better roll it off.  The width is a nice way to do this, since
-it represents an amount of distance that is essentially free.  
+it represents an amount of distance that is essentially free.
+... This isn't enough since there are many very short segments and
+some are adjacent to each other.  See [future work].  
 
 ```python 5. Adding the contributions
 
@@ -227,7 +229,9 @@ if os.path.isfile('data/bikeforest.geojson'):
 bikeforest = Forest(fromfile = filename)
 ```
 
-This works, but takes forever to run.  The following would run them all.  
+This works.  It does take a while, depending on how large the path
+network is.   The following would run them all, but would take a long
+time.
 ```python All, evaluate=False
 for j in range(29):
     l = 500*j
@@ -243,6 +247,8 @@ for i in gpd.np.random.choice(len(bikeforest), size = 1000, replace = False):
     bikeforest.growfromroot(i)
 bikeforest.save()
 ```
+
+#### Plotting
 
 Now let's make a few plots to see how it does.  First we'll make a map
 and highlight the most connected places.  I'd like it to be laid over
@@ -279,8 +285,9 @@ f[-1].savefig('figures/test.pdf')
 ### Future Work
 This is a first pass at doing this.  There is a big problem that there
 are many extremely short segments because of the random nature of
-dividing the paths.  These short segments ill-condition the
-statistic.  I must overhaul the process to break each path up into
-regularly sized segments.  In this case, it would take the population
-density of each segments as a weighted mean of the census tracts it
-passes through.  
+dividing the paths.  These short segments ill-condition the statistic.
+In addition there are some very long segments, so using a single
+length for the whole thing isn't quite right.  I must overhaul the
+process to break each path up into regularly sized segments.  In this
+case, it would take the population density of each segments as a
+weighted mean of the census tracts it passes through.

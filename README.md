@@ -24,7 +24,7 @@ be reached from the site.
 
 Bike facility data come from DRCOG's bike facility dataset, and
 population data are from census data.  
-[Bike facility data][facilities]
+[Bike facility data][facilities]  
 [Population data][census]
 
 The code and analysis is available here.  
