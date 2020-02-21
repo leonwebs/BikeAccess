@@ -73,8 +73,9 @@ w0 = 600 #ft, i.e. 100 yd on either side
 
 ```
 
-We want to break each path up by census tract and associate with each
-segment the density of the tract it passes through.  
+My originial idea was to chop up the paths by the census tract
+boundaries.  This isn't good, because it results in some very small
+lengths and it leaves some very long paths.  Instead I'd like to 
 
 ```python 2 Intersection
 ga['geocopy'] = ga.geometry
@@ -130,7 +131,7 @@ class Forest(gpd.geodataframe.GeoDataFrame):#, gpd.geodataframe.GeoDataFrame):
     def __init__(self, fromfile, gdf=segs, width=w0):
         if not fromfile==None:
             gdf = gpd.read_file(
-                'data/{}.geojson'.format(fromfile)))
+                'data/{}.geojson'.format(fromfile))
             gdf['sectsets'] = gpd.pd.read_pickle(
                 'data/{}sectsets'.format(fromfile))
         elif 'gstat' not in gdf.columns:
@@ -219,18 +220,15 @@ class Forest(gpd.geodataframe.GeoDataFrame):#, gpd.geodataframe.GeoDataFrame):
         self[['sectsets']].to_pickle(
             'data/{}sectsets'.format(filename))
 
-    def recoversaved(self, filename = 'bikeforest'):
-
-
+filename = None
+if os.path.isfile('data/bikeforest.geojson'):
+    filename='bikeforest'
+    print('Retrieving bikeforest from file')
+bikeforest = Forest(fromfile = filename)
 ```
 
 This works, but takes forever to run.  The following would run them all.  
 ```python All, evaluate=False
-bikeforest = Forest()
-
-print('Retrieving bikeforest from file')
-bikeforest.recoversaved()
-
 for j in range(29):
     l = 500*j
     for i in range(l,l+500):
@@ -239,7 +237,7 @@ for j in range(29):
     bikeforest.save()
 ```
 Instead let's pick a thousand at random and do them.  
-```python Monte Carlo
+```python Monte Carlo, evaluate=False
 for i in gpd.np.random.choice(len(bikeforest), size = 1000, replace = False):
     print(i)
     bikeforest.growfromroot(i)
@@ -251,8 +249,38 @@ and highlight the most connected places.  I'd like it to be laid over
 a street map, but let's pick up that piece later.  Then we'll plot the
 distribution of the statistic.  
 ```python Plotting
-bikeforest.plot(column='gstat')
+f = []
+ax = []
+def appendnewfig(*args, **kwargs):
+    f[len(f):], ax[len(ax):] = tuple(zip(
+        plt.subplots()
+        ))
+
+appendnewfig()
+bikeforest.plot(ax = ax[-1])
+bikeforest[bikeforest.gstat.notna()].plot(column='gstat', ax = ax[-1])
+f[-1].savefig('figures/map.pdf')
+appendnewfig()
 g = bikeforest.gstat[~gpd.np.isnan(bikeforest.gstat)]
-plt.plot(sorted(g), range(len(g))
+g.sort_values(inplace=True)
+g.reset_index(inplace = True, drop = True)
+g.plot(ax =ax[-1])
+f[-1].savefig('figures/cdf.pdf')
 ```
 
+```python Test Bed, evaluate = False, echo = False
+appendnewfig()
+h = bikeforest.n.sort_values()
+h.reset_index(inplace = True, drop = True)
+h.plot(ax = ax[-1], x = h.index, logy = True)
+f[-1].savefig('figures/test.pdf')
+```
+
+### Future Work
+This is a first pass at doing this.  There is a big problem that there
+are many extremely short segments because of the random nature of
+dividing the paths.  These short segments ill-condition the
+statistic.  I must overhaul the process to break each path up into
+regularly sized segments.  In this case, it would take the population
+density of each segments as a weighted mean of the census tracts it
+passes through.  
